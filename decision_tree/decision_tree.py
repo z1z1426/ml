@@ -79,11 +79,39 @@ def create_tree(dataset, labels):
     return my_tree
 
 
+def classify(input_tree, feat_labels, test_vec):
+    first_str = list(input_tree.keys())[0]
+    second_dict = input_tree[first_str]
+    feat_index = feat_labels.index(first_str)
+    for key in second_dict.keys():
+        if test_vec[feat_index] == key:
+            if isinstance(second_dict[key], dict):
+                class_label = classify(second_dict[key], feat_labels, test_vec)
+            else:
+                class_label = second_dict[key]
+    return class_label
+
+
+def store_tree(input_tree, filename):
+    import pickle
+    with open(filename, 'wb') as fw:
+        pickle.dump(input_tree, fw)
+
+
+def grab_tree(filename):
+    import pickle
+    with open(filename, 'rb') as fr:
+        return pickle.load(fr)
+
+
 if __name__ == '__main__':
     dataset, labels = create_dataset()
     tree_labels = labels[:]
     my_tree = create_tree(dataset, tree_labels)
-    print(1)
+    store_tree(my_tree, 'tree.txt')
+    tree = grab_tree('tree.txt')
+
+
 
 
 
