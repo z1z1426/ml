@@ -1,3 +1,4 @@
+# 代码详解：https://blog.csdn.net/qq_44124157/article/details/88427339
 import matplotlib.pyplot as plt
 
 
@@ -125,7 +126,7 @@ def plot_mid_text(cntr_pt, parent_pt, txt_string):
 
 def plot_tree(mytree, parent_pt, node_txt):
     num_leafs = get_num_leafs(mytree)
-    depth = get_tree_depth(mytree)
+    # depth = get_tree_depth(mytree)
     first_str = list(mytree.keys())[0]
     # 子节点的x坐标:计算原理
     # 目标:使用切割法保证当前决策树节点的坐标在其占有的区域的中间(切割掉不属于决策节点的叶子节点的区域)
@@ -226,7 +227,3 @@ def create_plot(intree):
     plot_tree(intree, (0.5, 1.0), '')
     plt.show()
 
-
-if __name__ == '__main__':
-    mytree = retrieve_tree(1)
-    create_plot(mytree)

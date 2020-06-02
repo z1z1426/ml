@@ -1,5 +1,6 @@
 import math
 import matplotlib.pyplot as plt
+from tree_plotter import *
 
 
 def calc_ShannonEnt(dataset):
@@ -50,6 +51,56 @@ def choose_bestfeature_to_split(dataset):
         info_gain = base_entroy - new_entroy
         if info_gain > best_infogain:
             best_infogain, best_feature = info_gain, i
+    return best_feature
+
+
+def choose_bestfeature_to_split_gini(dataset):
+    dataset_len = len(dataset)
+    best_infogain, best_feature = 0.0, -1
+    base_entroy = calc_ShannonEnt(dataset)
+    # 计算每个特征的信息增益
+    for i in range(len(dataset[0]) - 1):
+        feat_unique = set([item[i] for item in dataset])
+        new_entroy = 0.0
+        for j in feat_unique:
+            sub_dataset = split_dataset(dataset, i, j)
+            prob = len(sub_dataset) / float(dataset_len)
+            new_entroy += prob * calc_ShannonEnt(sub_dataset)
+        info_gain = base_entroy - new_entroy
+        if info_gain > best_infogain:
+            best_infogain, best_feature = info_gain, i
+    return best_feature
+
+
+def choose_bestfeature_to_split_rate(dataset):
+    dataset_len = len(dataset)
+    entroy_dic = {}
+    # best_infogain, best_feature = 0.0, -1
+    base_entroy = calc_ShannonEnt(dataset)
+    # 计算每个特征的信息增益
+    for i in range(len(dataset[0]) - 1):
+        feat_unique = set([item[i] for item in dataset])
+        new_entroy = 0.0
+        for j in feat_unique:
+            sub_dataset = split_dataset(dataset, i, j)
+            prob = len(sub_dataset) / float(dataset_len)
+            new_entroy += prob * calc_ShannonEnt(sub_dataset)
+        info_gain = base_entroy - new_entroy
+        entroy_dic[i] = info_gain
+        # if info_gain > best_infogain:
+        #     best_infogain, best_feature = info_gain, i
+    entroy_div = sorted(entroy_dic.items(), key=lambda x: x[1], reverse=True)[:dataset_len//2]
+    best_rate, best_feature = 0.0, -1
+    for index, entroy in entroy_div:
+        feat = [item[index] for item in dataset]
+        feat_unique = set(feat)
+        H_entroy = 0.0
+        for i in feat_unique:
+            prob = feat.count(i) / float(dataset_len)
+            H_entroy -= prob * math.log(prob, 2)
+        g_rate = entroy / H_entroy
+        if g_rate > best_rate:
+            best_rate, best_feature = g_rate, index
     return best_feature
 
 
@@ -105,11 +156,18 @@ def grab_tree(filename):
 
 
 if __name__ == '__main__':
-    dataset, labels = create_dataset()
-    tree_labels = labels[:]
-    my_tree = create_tree(dataset, tree_labels)
-    store_tree(my_tree, 'tree.txt')
-    tree = grab_tree('tree.txt')
+    # dataset, labels = create_dataset()
+    # with open('lenses.txt') as fr:
+    #     lenses = [inst.strip().split('\t') for inst in fr.readlines()]
+    #     lenses_labels = ['age', 'prescript', 'astigmatic', 'tearRate']
+    lenses, lenses_labels = create_dataset()
+    labels = lenses_labels[:]
+    my_tree = create_tree(lenses, lenses_labels)
+    print(classify(my_tree, labels, [1, 0]))
+    # create_plot(my_tree)
+    # store_tree(my_tree, 'tree.txt')
+    # tree = grab_tree('tree.txt')
+
 
 
 
