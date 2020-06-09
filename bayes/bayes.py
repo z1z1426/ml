@@ -1,105 +1,79 @@
+import pandas as pd
 import numpy as np
+import random
 
 
-def loadDataSet():
-    postingList = [['my', 'dog', 'has', 'flea', 'problems', 'help', 'please'],
-                   ['maybe', 'not', 'take', 'him', 'to', 'dog', 'park', 'stupid'],
-                   ['my', 'dalmation', 'is', 'so', 'cute', 'I', 'love', 'him'],
-                   ['stop', 'posting', 'stupid', 'worthless', 'garbage'],
-                   ['mr', 'licks', 'ate', 'my', 'steak', 'how', 'to', 'stop', 'him'],
-                   ['quit', 'buying', 'worthless', 'dog', 'food', 'stupid']]
-    classVec = [0, 1, 0, 1, 0, 1]  # 1 is abusive, 0 not
-    return postingList, classVec
+def splitData(data_list, ratio):
+    train_size = int(len(data_list)*ratio)
+    random.shuffle(data_list)
+    train_set = data_list[:train_size]
+    test_set = data_list[train_size:]
+    return train_set, test_set
 
 
-def create_vocablist(dataset):
-    vocab_set = set([])
+def seprate_by_class(dataset):
+    class_dict = {}
+    p_pre = {}
     for i in dataset:
-        vocab_set = vocab_set | set(i)
-    return list(vocab_set)
+        label = i[-1]
+        if label not in class_dict:
+            class_dict[label] = []
+        class_dict[label].append(i[:-1])
+    for i in class_dict:
+        p_pre[i] = len(class_dict[i]) / float(len(dataset))
+    return class_dict, p_pre
 
 
-def words2vec(vocablist, document):
-    doc_vec = [0] * len(vocablist)
-    for word in document:
-        if word in vocablist:
-            doc_vec[vocablist.index[word]] = 1
-        else:
-            print('%s该词不在词库里' % word)
-    return doc_vec
+def mean_and_var(class_list):
+    class_list = [float(x) for x in class_list]
+    mean = sum(class_list) / (len(class_list))
+    var = sum([np.math.pow(x - mean, 2) for x in class_list]) / (len(class_list) - 1)
+    return mean, var
 
 
-def train_bayes(train_matrix, train_category):
-    num_doc = len(train_matrix)
-    num_word = len(train_matrix[0])
-    p_abusive = sum(train_category) / float(num_doc)
-    p0, p1 = np.ones(num_word), np.ones(num_word)
-    p0_total, p1_total = 2.0, 2.0
-    for i in range(num_doc):
-        if train_category[i] == 1:
-            p1 += train_matrix[i]
-            p1_total += sum(train_matrix[i])
-        else:
-            p0 += train_matrix[i]
-            p0_total += sum(train_matrix[i])
-    p1_vec, p0_vec = p1 / p1_total, p0 / p0_total
-    return p0_vec, p1_vec, p_abusive
+def cal_prob(x, mean, var):
+    exponent = np.math.exp(np.math.pow(x-mean, 2) / (-2 * var))
+    prob = 1 / np.math.sqrt(2 * np.math.pi * var) * exponent
+    return prob
 
 
-'''
-def set_of_words2vec(vocablist, input_set):
-    return_vec = [0] * len(vocablist)
-    for word in input_set:
-        if word in vocablist:
-            return_vec[vocablist.index(word)] = 1
-        else:
-            print('the word:%s is not in my vocabulary!' % word)
-    return return_vec
-'''
+def train(train_set):
+    class_dict, p_pre = seprate_by_class(train_set)
+    summary = {}
+    for label, class_list in class_dict.items():
+        summary[label] = [mean_and_var(x) for x in zip(*class_list)]
+    return summary, p_pre
 
 
-def train_nbo(train_matrix, train_category):
-    num_traindocs = len(train_matrix)
-    num_words = len(train_matrix[0])
-    p_abusive = sum(train_category) / float(num_traindocs)
-    p0_num = np.ones(num_words)
-    p1_num = np.ones(num_words)
-    p0_denom, p1_denom = 2.0, 2.0
-    for i in range(num_traindocs):
-        if train_category[i] == 1:
-            p1_num += train_matrix[i]
-            p1_denom += sum(train_matrix[i])
-        else:
-            p0_num += train_matrix[i]
-            p0_denom += sum(train_matrix[i])
-    p1_vect = np.log(p1_num / p1_denom)
-    p0_vect = np.log(p0_num / p0_denom)
-    return p0_vect, p1_vect, p_abusive
+def cal_class_prob(input_data, attr):
+    prob = 1
+    for i, item in enumerate(input_data):
+        prob *= cal_prob(item, attr[i][0], attr[i][1])
+    return prob
 
 
-def classify_nb(vec2classify, p0_vec, p1_vec, p_class1):
-    p1 = np.sum(vec2classify * p1_vec) + np.log(p_class1)
-    p0 = np.sum(vec2classify * p0_vec) + np.log(1.0 - p_class1)
-    if p1 > p0:
-        return 1
-    else:
-        return 0
+def predict_one(input_data, summary, p_pre):
+    result = {}
+    for label, item in summary.items():
+        result[label] = cal_class_prob(input_data, item) * p_pre[label]
+    return max(result, key=result.get)
 
 
-def testing_nb():
-    list_oposts, list_classes = loadDataSet()
-    my_vocablist = create_vocablist(list_oposts)
-    train_mat = []
-    for post_in_doc in list_oposts:
-        train_mat.append(set_of_words2vec(my_vocablist, post_in_doc))
-    p0_v, p1_v, p_ab = train_nbo(train_mat, list_classes)
-    test_entry = ['love', 'my', 'dalmation']
-    this_doc = np.array(set_of_words2vec(my_vocablist, test_entry))
-    print(test_entry, 'classified as: ', classify_nb(this_doc, p0_v, p1_v, p_ab))
-    test_entry = ['stupid', 'garbage']
-    this_doc = np.array(set_of_words2vec(my_vocablist, test_entry))
-    print(test_entry, 'classified as: ', classify_nb(this_doc, p0_v, p1_v, p_ab))
+def test(test_set, summary, p_pre):
+    correct = 0
+    for i in test_set:
+        input_data = i[:-1]
+        label = i[-1]
+        predict = predict_one(input_data, summary, p_pre)
+        if predict == label:
+            correct += 1
+    return correct / len(test_set)
 
 
 if __name__ == '__main__':
-    testing_nb()
+    data_df = pd.read_csv('IrisData.csv')
+    data_list = np.array(data_df).tolist()
+    train_set, test_set = splitData(data_list, 0.7)
+    summary, p_pre = train(train_set)
+    print(test(test_set, summary, p_pre))
+
