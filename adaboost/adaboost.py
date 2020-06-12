@@ -24,6 +24,16 @@ def stump_classify(data_matrix, dimen, thresh_val, thresh_ineq):
 
 
 def build_stump(data_arr, class_labels, D):
+    '''
+    得到决策树模型
+    :param data_arr: 特征标签集合
+    :param class_labels: 分类标签集合
+    :param D: 最初的特征权重值
+    :return:
+    :best_stump: 最优的分类器模型
+    :min_error: 错误率
+    :best_classset: 训练后的结果集
+    '''
     # 将数据集和标签列表转为矩阵形式
     data_matrix, label_mat = np.mat(data_arr), np.mat(class_labels).T
     m, n = np.shape(data_matrix)
@@ -31,7 +41,7 @@ def build_stump(data_arr, class_labels, D):
     num_steps, best_stump, best_classset = 10.0, {}, np.mat(np.zeros((m, 1)))
     # 最小错误率初始化为+∞
     min_error = np.inf
-    # 遍历每一列的特征值
+    # 遍历每一列的特征值，将列切分成若干份，每一段以最左边的点作为分类节点
     for i in range(n):
         # 找出列中特征值的最小值和最大值
         range_min, range_max = data_matrix[:, i].min(), data_matrix[:, i].max()
@@ -51,9 +61,8 @@ def build_stump(data_arr, class_labels, D):
                 # 计算"加权"的错误率
                 weighted_error = D.T * err_arr
                 # 打印相关信息，可省略
-                # print("split: dim %d, thresh %.2f,thresh inequal:\
-                #    %s, the weighted error is %.3f",
-                #    %(i,threshVal,inequal,weigthedError))
+                print("split: dim %d, thresh %.2f,thresh inequal:\
+                   %s, the weighted error is %.3f" % (i, thresh_val, inequal, weighted_error))
                 # 如果当前错误率小于当前最小错误率，将当前错误率作为最小错误率
                 # 存储相关信息
                 if weighted_error < min_error:
@@ -69,15 +78,49 @@ def build_stump(data_arr, class_labels, D):
 def adaboost_trainds(data_arr, class_labels, num_it=40):
     weak_class_arr = []
     m = np.shape(data_arr)[0]
+    # D表示最初值，对1进行5等分，平均每一个初始的概率都为0.2
     D = np.mat(np.ones((m, 1)) / m)
     agg_class_est = np.mat(np.zeros((m, 1)))
     for i in range(num_it):
         best_stump, error, class_est = build_stump(data_arr, class_labels, D)
-        pass
+        print("D:", D.T)
+        alpha = float(0.5*np.log((1.0-error)/max(error, 1e-16)))
+        best_stump['alpha'] = alpha
+        weak_class_arr.append(best_stump)
+        print("class_est: ", class_est.T)
+        # 分类正确: 乘积为1，不会影响结果，-1主要是下面求e的-alpha次方
+        # 分类错误: 乘积为 -1，结果会受影响，所以也乘以 -1
+        expon = np.multiply(-1 * alpha * np.mat(class_labels).T, class_est)
+        # 计算e的expon次方，然后计算得到一个综合的概率的值
+        # 结果发现:  判断错误的样本，D中相对应的样本权重值会变大。
+        D = np.multiply(D, np.exp(expon))
+        D = D / D.sum()
+        # 预测的分类结果值，在上一轮结果的基础上，进行加和操作
+        agg_class_est += alpha * class_est
+        print("agg_class_est: ", agg_class_est.T)
+        # sign 判断正为1， 0为0， 负为-1，通过最终加和的权重值，判断符号。
+        # 结果为: 错误的样本标签集合，因为是 !=,那么结果就是0 正, 1 负
+        agg_errors = np.multiply(np.sign(agg_class_est) != np.mat(class_labels).T, np.ones((m, 1)))
+        error_rate = agg_errors.sum() / m
+        print("total error: ", error_rate, '\n')
+        if error_rate == 0.0:
+            break
+    return weak_class_arr
+
+
+def ada_classify(dat_to_class, classifier_arr):
+    data_matrix = np.mat(dat_to_class)
+    m = np.shape(data_matrix)[0]
+    agg_class_est = np.mat(np.zeros((m, 1)))
+    for i in range(len(classifier_arr)):
+        class_est = stump_classify(data_matrix, classifier_arr[i]['dim'], classifier_arr[i]['thresh'],
+                                   classifier_arr[i]['ineq'])
+        agg_class_est += classifier_arr[i]['alpha'] * class_est
+        print(agg_class_est)
+    return np.sign(agg_class_est)
 
 
 if __name__ == '__main__':
     data_mat, class_labels = load_simpdata()
-    D = np.mat(np.ones((5, 1)) / 5)
-    build_stump(data_mat, class_labels, D)
+    weak_class_arr = adaboost_trainds(data_mat, class_labels)
     print(1)
